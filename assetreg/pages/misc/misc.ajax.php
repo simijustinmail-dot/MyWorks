@@ -471,6 +471,19 @@ switch($type){
 			echo json_encode(['status' => 'error', 'message' => 'No seats found.']);
 		}
 		break;
+	case 'getSeatsOnSection': 
+		$section_id = isset($_GET['section_id']) ? $_GET['section_id'] : ""; 
+		$res = $objcommon->getSeatDetailsOnSection($section_id); 
+		$data = [];
+		if ($res) {
+			while ($row = $asset_connObj->db_fetch_array($res)) {
+				$data[] = $row;
+			}
+			echo json_encode(['status' => 'success', 'data' => $data]);
+		} else {
+			echo json_encode(['status' => 'error', 'message' => 'No seats found.']);
+		}
+		break;
 	case 'getSeatRoles':
 		$res = $objcommon->getSeatRoleDetails(); 
 		$data = [];
