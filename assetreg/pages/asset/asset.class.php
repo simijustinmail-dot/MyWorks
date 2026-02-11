@@ -184,9 +184,10 @@ class Asset {
  $initial_valuation_date, $initial_valuation_value, $revaluation_date, $revaluation_value,$estimated_life_years, $estimated_residual_value, $carrying_cost_begin, 
  $years_expired,$years_remaining, $life_over_or_5_percent, $depreciation_rate, $accumulated_depreciation,$adjustments_this_year, $carrying_cost_end,$sale_date, 
  $sale_invoice_no, $sale_value_excl_gst,$purchaser_name, $purchaser_address,$profit_loss_sale, $profit_loss_revaluation, $impairment_loss,$custom_fields,$userid,$asset_status,$verification_comment,$is_verified,
- $gst_percentage,$discount){
+ $gst_percentage,$discount,$verified_by_id,$verified_by_name,$verification_date,$action){
         try { 
 		pg_query($this->conObj->c_link, "BEGIN");
+		$logger = new Logger($this->conObj->c_link);
 
         // Generate asset code if new record
         if ($asset_id == 0) { 
@@ -283,7 +284,10 @@ class Asset {
             verification_comment = $80,
             is_verified = $81,
 			gst_percentage = $83,
-			discount = $84
+			discount = $84,
+			verified_by_id = $85,
+			verified_by_name = $86, 
+			verification_date = $87
         WHERE asset_id = $82";
 
         $stmtName = "update_asset";
@@ -307,7 +311,8 @@ class Asset {
             $sale_date, $sale_invoice_no, $sale_value_excl_gst, $purchaser_name, $purchaser_address,
             $profit_loss_on_sale, $profit_loss_on_revaluation, $impairment_loss,
             $custom_fields, $userid,
-            $asset_status, $verification_comment, $is_verified, $asset_id,$gst_percentage,$discount
+            $asset_status, $verification_comment, $is_verified, $asset_id,$gst_percentage,$discount,
+			$verified_by_id,$verified_by_name,$verification_date
         ];
         } else {
              $sql = "INSERT INTO asset (
@@ -328,7 +333,8 @@ class Asset {
 			life_over_or_5_percent, depreciation_rate, accumulated_depreciation, adjustments_this_year, carrying_cost_end,
 			sale_date, sale_invoice_no, sale_value_excl_gst, purchaser_name, purchaser_address,
 			profit_loss_on_sale, profit_loss_on_revaluation, impairment_loss, custom_fields,
-			created_by, created_date, last_updated_by, last_updated_date, gst_percentage, discount
+			created_by, created_date, last_updated_by, last_updated_date, gst_percentage, discount,
+			verified_by_id, verified_by_name, verification_date
 			) VALUES (
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9,
@@ -346,8 +352,8 @@ class Asset {
 			$66, $67, $68, $69, $70,
 			$71, $72, $73, $74, $75,
 			$76, $77, $78, 
-			$79, now(), $80, now(), $81, $82
-			)";
+			$79, now(), $80, now(), $81, $82, $83, $84, $85
+			) RETURNING asset_id";
 
 		$stmtName = "insert_asset";
 		$params = [
@@ -368,7 +374,7 @@ class Asset {
 			$life_over_or_5_percent, $depreciation_rate, $accumulated_depreciation, $adjustments_this_year, $carrying_cost_end,
 			$sale_date, $sale_invoice_no, $sale_value_excl_gst, $purchaser_name, $purchaser_address,
 			$profit_loss_on_sale, $profit_loss_on_revaluation, $impairment_loss, $custom_fields,
-			$userid, $userid, $gst_percentage, $discount
+			$userid, $userid, $gst_percentage, $discount, $verified_by_id,$verified_by_name,$verification_date
 			];
         }
 
@@ -384,7 +390,17 @@ class Asset {
 			throw new Exception(pg_last_error($this->conObj->c_link));
             //return ['success' => false, 'message' => pg_last_error($this->conObj->c_link)];
         }
-
+		if ($asset_id > 0) {
+			// UPDATE
+			$recordId = $asset_id;
+		} else {
+			// INSERT
+			$row = pg_fetch_assoc($res);
+			$recordId = $row["asset_id"];
+		}
+		$recordId = '{' . intval($recordId) . '}';
+		$logger->autoLog($userid, $sql,$params, 'asset', $recordId,$action);
+		pg_query($this->conObj->c_link, "COMMIT");
         return ['success' => true, 'message' => 'Asset saved successfully', 'asset_code' => $asset_unique_code];
     } catch (Exception $e) { echo($e);
 		pg_query($this->conObj->c_link, "ROLLBACK");
@@ -443,13 +459,148 @@ class Asset {
         throw $e;
     }
 }
-function checkKuhsCodeDuplication($asset_id,$asset_kuhs_code) { 
+	function checkKuhsCodeDuplication($asset_id,$asset_kuhs_code) { 
 		pg_query($this->conObj->c_link, "DEALLOCATE ALL");
 		$sql = "SELECT 1 FROM public.asset WHERE asset_id != $1 AND asset_kuhs_code = $2";
 		$prepared = pg_prepare($this->conObj->c_link, "check_assetkuhscode", $sql);
 		if ($prepared === false) return false;
 
 		return pg_execute($this->conObj->c_link, "check_assetkuhscode", array($asset_id, $asset_kuhs_code));
-	}	
+	}
+	public function saveAssetVerificationHistory($asset_id, $verified_by_id, $verified_by_name, $verification_date, $verification_comment, $asset_status) {
+        try {
+            pg_query($this->conObj->c_link, "DEALLOCATE ALL");
+
+            $sql = "INSERT INTO public.asset_verification_history
+                    (asset_id, verified_by_id, verified_by_name, verification_date, verification_comment, asset_status)
+                    VALUES($1, $2, $3, $4, $5, $6)"; 
+
+            $prepared = pg_prepare($this->conObj->c_link, "add_asset_verification_history", $sql); 
+            if ($prepared === false) {
+                return ['success' => false, 'message' => pg_last_error($this->conObj->c_link)];
+            }
+            $res = pg_execute($this->conObj->c_link, "add_asset_verification_history", array($asset_id, $verified_by_id, $verified_by_name, $verification_date, $verification_comment, $asset_status));
+            if ($res === false) {
+                return ['success' => false, 'message' => pg_last_error($this->conObj->c_link)];
+            }
+            return ['success' => true, 'message' => 'Asset Verification History added successfully'];
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+	function updateAssetLocationBulk($userid, $asset_ids,$campus_id, $campus_name, $land_id, $land_name, $building_id, $building_name, $floor_id, $floor_name, $room_id, $room_name,
+								 $section_id, $section_name, $seat_id, $seat_name, $admin_sanction_no, $admin_sanction_date, $technical_sanction_no, $technical_sanction_date,
+								 $work_order_no, $work_order_date, $supply_order_no, $supply_order_date, $total_cost) {
+    try {
+		$physical = [
+			'campus_id'     => $campus_id,
+			'campus_name'   => $campus_name,
+			'land_id'       => $land_id,
+			'land_name'     => $land_name,
+			'building_id'   => $building_id,
+			'building_name' => $building_name,
+			'floor_id'      => $floor_id,
+			'floor_name'    => $floor_name,
+			'room_id'       => $room_id,
+			'room_name'     => $room_name,
+		];
+
+		$logical = [
+			'section_id'    => $section_id,
+			'section_name'  => $section_name,
+			'seat_id'       => $seat_id,
+			'seat_name'     => $seat_name,
+		];
+		
+		$administrative = [
+		'admin_sanction_no'        => $admin_sanction_no,
+		'admin_sanction_date'      => $admin_sanction_date,
+		'technical_sanction_no'    => $technical_sanction_no,
+		'technical_sanction_date'  => $technical_sanction_date,
+		'work_order_no'            => $work_order_no,
+		'work_order_date'          => $work_order_date,
+		'supply_order_no'          => $supply_order_no,
+		'supply_order_date'        => $supply_order_date
+		];
+		$costdetails = [
+		'total_cost'               => $total_cost
+		];
+		$set = [];
+		$params = [];
+		$i = 1;
+
+		/* Physical location updated only if campus_id is not null */
+		if ($campus_id !== null && $campus_id !== '') {
+			foreach ($physical as $col => $val) {
+				//if ($val !== null && $val !== '') {
+					$set[] = "$col = \$$i";
+					$params[] = $val;
+					$i++;
+				//}
+			}
+		}
+
+		/* Logical location updated only if section_id is not null */
+		if ($section_id !== null && $section_id !== '') {
+			foreach ($logical as $col => $val) {
+				//if ($val !== null && $val !== '') {
+					$set[] = "$col = \$$i";
+					$params[] = $val;
+					$i++;
+				//}
+			}
+		}
+		
+		/* Administration */
+		foreach ($administrative as $col => $val) {
+			if ($val !== null && $val !== '') {
+				$set[] = "$col = \$$i";
+				$params[] = $val;
+				$i++;
+			}
+		}
+		
+		/* Cost */
+		foreach ($costdetails as $col => $val) {
+			if ($val !== null && $val !== '') {
+				$set[] = "$col = \$$i";
+				$params[] = $val;
+				$i++;
+			}
+		}
+		
+		if (empty($set)) {
+			throw new Exception("No valid fields to update based on location rules");
+		}
+		if (!is_array($asset_ids) || empty($asset_ids)) {
+			throw new Exception("asset_ids must be a non-empty array");
+		}
+		$set[] = "last_updated_by = \$$i";
+		$params[] = $userid;
+		$i++;
+
+		$set[] = "last_updated_date = now()";
+		
+		pg_query($this->conObj->c_link, "BEGIN");
+		$logger = new Logger($this->conObj->c_link);
+		$asset_ids_pg = '{' . implode(',', array_map('intval', $asset_ids)) . '}';
+
+		$params[] = $asset_ids_pg;
+
+		$sql = "UPDATE asset SET " . implode(', ', $set) . " WHERE asset_id = ANY (\$$i)";
+		$res = pg_query_params($this->conObj->c_link, $sql, $params);
+        if (!$res) {
+            throw new Exception(pg_last_error($this->conObj->c_link));
+        }
+		
+		$logger->autoLog($userid, $sql, $params, 'asset', $asset_ids_pg, 'bulkupdate');
+        pg_query($this->conObj->c_link, "COMMIT");
+        return array('status' => 'success', 'message' => 'Bulk update');
+
+    } catch (Exception $e) {
+        pg_query($this->conObj->c_link, "ROLLBACK");
+        return array('status' => 'error', 'message' => $e->getMessage());
+    }
+}
 }
 ?>

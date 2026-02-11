@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 //include_once ("../../common/auth.php");
+include_once ("../../common/logger.php");
 include_once("asset.class.php"); 
 include_once("../../connection.php"); 
 include_once("../../class/common.class.php"); 
@@ -268,14 +269,18 @@ switch($type){
 	case 'getAssets': 
     $typeId = isset($_GET['asset_type_id']) ? intval($_GET['asset_type_id']) : 0;
     $subTypeId = isset($_GET['asset_subtype_id']) ? intval($_GET['asset_subtype_id']) : 0; 
-    $entityId = isset($_GET['entity_id']) ? intval($_GET['entity_id']) : 0;
-    $nodeId = isset($_GET['node_id']) ? intval($_GET['node_id']) : 0;
+    $entityId = isset($_GET['asset_subtype_entity_id']) ? intval($_GET['asset_subtype_entity_id']) : 0;
+    $nodeId = isset($_GET['asset_subtype_entitynode_id']) ? intval($_GET['asset_subtype_entitynode_id']) : 0;
 	$campusId = isset($_GET['campus_id']) ? intval($_GET['campus_id']) : 0;
 	$landId = isset($_GET['land_id']) ? intval($_GET['land_id']) : 0;
 	$buildingId = isset($_GET['building_id']) ? intval($_GET['building_id']) : 0;
 	$floorId = isset($_GET['floor_id']) ? intval($_GET['floor_id']) : 0;
+	$roomId = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
 	$sectionId = isset($_GET['section_id']) ? intval($_GET['section_id']) : 0;
 	$seatId = isset($_GET['seat_id']) ? intval($_GET['seat_id']) : 0;
+	$assigned = isset($_GET['assigned']) ? $_GET['assigned'] : '';
+	$verified = isset($_GET['verified']) ? $_GET['verified'] : '';
+	$search = isset($_GET['search']) ? trim($_GET['search']) : ''; 
 
 	$page  = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $limit = isset($_GET['limit']) ? max(1, intval($_GET['limit'])) : 20; // default 20 rows
@@ -284,10 +289,10 @@ switch($type){
 	$userrole = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : "ITSuper"; 
 	$usersection = isset($_SESSION['user_section']) ? $_SESSION['user_section'] : ""; 
 	//fetch asset
-    $res = $objcommon->getAssets($typeId, $subTypeId, $entityId, $nodeId,$campusId, $landId,$buildingId,$floorId,$roomId,$sectionId,$seatId,$limit,$offset,$userrole,$usersection);
+     $res = $objcommon->getAssets($typeId, $subTypeId, $entityId, $nodeId,$campusId, $landId,$buildingId,$floorId,$roomId,$sectionId,$seatId,$limit,$offset,$userrole,$usersection,$assigned,$verified,$search);
 
 	// Fetch total count
-    $totalCount = $objcommon->getAssetsCount($typeId, $subTypeId, $entityId, $nodeId, $campusId, $landId, $buildingId, $floorId, $roomId, $sectionId,$SeatId,$userrole,$usersection);
+    $totalCounts = $objcommon->getAssetsCount($typeId, $subTypeId, $entityId, $nodeId, $campusId, $landId, $buildingId, $floorId, $roomId, $sectionId,$seatId,$userrole,$usersection,$assigned,$verified,$search);
 
     $data = [];
 	
@@ -317,7 +322,9 @@ switch($type){
         echo json_encode([
             'status' => 'success', 
             'data' => $data, 
-            'total' => $totalCount,
+            'total' => $totalCounts['total'],
+			'verified' => $totalCounts['verified'],
+			'assigned' => $totalCounts['assigned'],
             'page' => $page,
             'limit' => $limit
         ]);
@@ -444,12 +451,23 @@ switch($type){
 		// Encode to proper JSON once before saving
 		$custom_fields_json = json_encode($custom_fields, JSON_UNESCAPED_UNICODE);
 		//echo($custom_fields_json); exit();
-    $is_verified = isset($data['is_verified']) ? $data['is_verified'] : 'f';
-	$verification_comment = (isset($data['verification_comment']) && trim($data['verification_comment']) !== '') ? $data['verification_comment'] : null;
-	$asset_status = (isset($data['asset_status']) && trim($data['asset_status']) !== '') ? $data['asset_status'] : null;
 
 	$userid = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0;
-	
+	$username = isset($_SESSION['user_name']) ? $_SESSION['user_name'] : 0;
+
+	$action = isset($data['action']) ? $data['action'] : null;
+
+	$is_verified = null; $verification_comment = null; $asset_status = null; $verified_by_id = null; $verified_by_name = null; $verification_date = null;
+
+	if ($action === 'verify') {
+		$is_verified = isset($data['is_verified']) ? $data['is_verified'] : 'f';
+		$verification_comment = (isset($data['verification_comment']) && trim($data['verification_comment']) !== '') ? $data['verification_comment'] : null;
+		$asset_status = (isset($data['asset_status']) && trim($data['asset_status']) !== '') ? $data['asset_status'] : null;
+		$verified_by_id = $userid;
+		$verified_by_name = $username;
+		$verification_date = date('Y-m-d H:i:s');		
+	}
+
 	$res = $assetObj->saveAsset($asset_id, $asset_unique_code, $asset_kuhs_code, $asset_serial_no, $asset_model_no, $asset_name,
 								$asset_type_id, $asset_type_name, $asset_subtype_id, $asset_subtype_name, $asset_subtype_entity_id,
 								$asset_subtype_entity_name, $asset_subtype_entitynode_id, $asset_subtype_entitynode_name, $campus_id,
@@ -465,7 +483,15 @@ switch($type){
 								$years_remaining, $life_over_or_5_percent, $depreciation_rate, $accumulated_depreciation,
 								$adjustments_this_year, $carrying_cost_end,$sale_date, $sale_invoice_no, $sale_value_excl_gst, 
 								$purchaser_name, $purchaser_address,$profit_loss_on_sale, $profit_loss_on_revaluation, $impairment_loss,
-								$custom_fields_json,$userid,$asset_status,$verification_comment,$is_verified,$gst_percentage,$discount);
+								$custom_fields_json,$userid,$asset_status,$verification_comment,$is_verified,$gst_percentage,$discount,
+								$verified_by_id,$verified_by_name,$verification_date,$action);
+	if ($res && $action === 'verify') {
+		$tracking_res = $assetObj->saveAssetVerificationHistory($asset_id, $verified_by_id, $verified_by_name, $verification_date, $verification_comment, $asset_status);
+
+		if (!$tracking_res) {
+			$res = false; // force rollback
+		}
+	}
    if($res){
                 $asset_connObj->db_query($asset_connObj->c_link, 'COMMIT');
                 echo json_encode(['status' => 'success', 'message' => 'Asset Saved Successfully']);;
@@ -477,7 +503,63 @@ switch($type){
             }
    
     break;
+	case 'bulkUpdateAsset':
+
+    $asset_ids = $data['asset_ids'];
+
+    $campus_id   = $data['campus_id']   !== '' ? intval($data['campus_id']) : null;
+    $campus_name = trim($data['campus_name']) ?: null;
+    $land_id   = $data['land_id']   !== '' ? intval($data['land_id']) : null;
+    $land_name = trim($data['land_name']) ?: null;
+    $building_id   = $data['building_id']   !== '' ? intval($data['building_id']) : null;
+    $building_name = trim($data['building_name']) ?: null;
+    $floor_id   = $data['floor_id']   !== '' ? intval($data['floor_id']) : null;
+    $floor_name = trim($data['floor_name']) ?: null;
+    $room_id   = $data['room_id']   !== '' ? intval($data['room_id']) : null;
+    $room_name = trim($data['room_name']) ?: null;
+    $section_id   = $data['section_id']   !== '' ? intval($data['section_id']) : null;
+    $section_name = trim($data['section_name']) ?: null;
+    $seat_id   = $data['seat_id']   !== '' ? intval($data['seat_id']) : null;
+    $seat_name = trim($data['seat_name']) ?: null;	
+	$admin_sanction_no   = trim($data['admin_sanction_no']) ?: null;
+	$admin_sanction_date = trim($data['admin_sanction_date']) ?: null;
+	$technical_sanction_no   = trim($data['technical_sanction_no']) ?: null;
+	$technical_sanction_date = trim($data['technical_sanction_date']) ?: null;
+	$work_order_no   = trim($data['work_order_no']) ?: null;
+	$work_order_date = trim($data['work_order_date']) ?: null;
+	$supply_order_no   = trim($data['supply_order_no']) ?: null;
+	$supply_order_date = trim($data['supply_order_date']) ?: null;
+	$total_cost = $data['total_cost'] !== '' ? floatval($data['total_cost']) : null;
 	
+	$userid = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0;
+
+	$res = $assetObj->updateAssetLocationBulk(
+	    $userid,
+        $asset_ids,
+        $campus_id, $campus_name,
+        $land_id, $land_name,
+        $building_id, $building_name,
+        $floor_id, $floor_name,
+        $room_id, $room_name,
+        $section_id, $section_name,
+        $seat_id, $seat_name,
+		$admin_sanction_no,
+		$admin_sanction_date,
+		$technical_sanction_no,
+		$technical_sanction_date,
+		$work_order_no,
+		$work_order_date,
+		$supply_order_no,
+		$supply_order_date,
+		$total_cost
+    );
+
+	if ($res) {
+			echo json_encode(['status' => 'success', 'message' => 'Bulk Location update done Successfully']);
+		} else {
+			echo json_encode(['status' => 'error', 'message' => '"Error Occured while bulk location update. Please Contact IT Admin!!!"']);
+		}
+    break;
 	case 'getAssetFieldSettings':
     $assetTypeId = isset($_GET['asset_type_id']) ? $_GET['asset_type_id'] : null;
 
