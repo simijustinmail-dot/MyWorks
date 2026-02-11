@@ -116,6 +116,14 @@ class common {
                ORDER BY seat_id";
     return $this->conObj->db_query($this->conObj->c_link, $strsql);
 	}
+	function getSeatDetailsOnSection($section_id) {
+    $strsql = "SELECT *
+               FROM public.seat 
+			   WHERE (section_id = $section_id
+               OR section_id IS NULL)
+               ORDER BY seat_id";
+    return $this->conObj->db_query($this->conObj->c_link, $strsql);
+	}
 	function getSeatRoleDetails() {
     $strsql = "SELECT *
                FROM public.seatrole 
@@ -235,11 +243,11 @@ class common {
     $prefix = $alias ? $alias . "." : "";
 
     $roleTypeMap = [
-        'WorksAdminMEP' => [30],
-        'WorksAdminCivil'      => [31, 20, 21],
-        'PurchaseAdmin'        => [23, 19],
-        'ITAdmin'              => [25, 26, 16],
-        'AdministrationAdmin'  => [17],
+        'WorksAdminMEP' => [30], //
+        'WorksAdminCivil'      => [31, 20, 21, 18], // "A-4";"Land" "A-5";"Buildings" "A-11";"Water supply & Sanitary Fittings" "A-2";"Machinery"
+        'PurchaseAdmin'        => [23, 18], // "A-7";"Furniture and Fixture" "A-2";"Machinery"
+        'ITAdmin'              => [25, 26], // "A-9T";"Other Non-financial Assets(Tangible)" "A-9I";"Other Non-financial Assets(Intangible)"
+        'VehiclesAdmin'  => [17], // "A-1";"Motor Vehicles"
     ];
 
     $condition = "";
@@ -260,8 +268,48 @@ class common {
 
     return $condition;
 	}
-	
-	function getAssets($typeId = 0, $subTypeId = 0, $entityId = 0, $nodeId = 0, $campusId = 0, $landId =0, $buildingId =0, $floorId=0, $roomId=0, $sectionId=0, $seatId=0, $limit=20, $offset=0, $userrole="",$usersection="") {
+	function getAssignedCondition($assigned, $alias = "")
+	{
+		$prefix = $alias ? $alias . "." : "";
+		$condition = "";
+		if ($assigned === "1") { // considered as assigned if section is assigned for asset
+			$condition .= " AND {$prefix}section_id IS NOT NULL";
+		} elseif ($assigned === "0") {
+			$condition .= " AND {$prefix}section_id IS NULL";
+		}
+		return $condition;
+	}
+	function getVerifiedCondition($verified, $alias = "")
+	{
+		$prefix = $alias ? $alias . "." : "";
+		$condition = "";
+		if ($verified === "1") { // Considered as verified is is_verified is 't'
+			$condition .= " AND {$prefix}is_verified = 't'";
+		} elseif ($verified === "0") {
+			$condition .= " AND ({$prefix}is_verified = 'f' OR {$prefix}is_verified IS NULL)";
+		}
+		return $condition;
+	}
+	function getSearchCondition($search, $alias = "")
+	{
+		$prefix = $alias ? $alias . "." : "";
+		$condition = "";
+
+		if (trim($search) !== '') {
+			$search = pg_escape_string($search);
+
+			$condition .= " AND (
+				{$prefix}asset_name ILIKE '%{$search}%' OR
+				{$prefix}asset_unique_code ILIKE '%{$search}%' OR
+				{$prefix}asset_kuhs_code ILIKE '%{$search}%' OR
+				{$prefix}asset_model_no ILIKE '%{$search}%' OR
+				{$prefix}asset_serial_no ILIKE '%{$search}%'
+			)";
+		}
+
+		return $condition;
+	}
+	function getAssets($typeId = 0, $subTypeId = 0, $entityId = 0, $nodeId = 0, $campusId = 0, $landId =0, $buildingId =0, $floorId=0, $roomId=0, $sectionId=0, $seatId=0, $limit=20, $offset=0, $userrole="",$usersection="",$assigned = "",$verified = "",$search="") {
     $where = "WHERE 1=1";  
 	if($userrole == "SectionAdmin")
 	{
@@ -281,6 +329,10 @@ class common {
 	if ($roomId) $where .= " AND a.room_id = $roomId";
 	if ($sectionId) $where .= " AND a.section_id = $sectionId";
 	if ($seatId) $where .= " AND a.seat_id = $seatId";
+	
+	$where .= $this->getAssignedCondition($assigned, "a");
+	$where .= $this->getVerifiedCondition($verified, "a");
+	$where .= $this->getSearchCondition($search, "a");
 
     /*$strsql = "SELECT 
                     a.asset_id,
@@ -301,71 +353,7 @@ class common {
                $where
                ORDER BY a.asset_id DESC";*/
 	   $strsql = "SELECT 
-                    a.asset_id,
-                    a.asset_name,
-                    a.asset_unique_code,
-                    a.asset_kuhs_code,
-                    a.asset_model_no,
-					a.asset_serial_no,
-                    a.current_location,
-					a.campus_id,
-					a.campus_name,
-					a.land_id,
-					a.land_name,
-					a.building_id,
-					a.building_name,
-					a.floor_id,
-					a.floor_name,
-					a.room_id,
-					a.room_name,
-					a.section_id,
-					a.section_name,
-					a.seat_id,
-					a.seat_name,
-					a.asset_type_id,
-                    a.asset_type_name,
-					a.asset_subtype_id,
-                    a.asset_subtype_name,
-					a.asset_subtype_entity_id,
-                    a.asset_subtype_entity_name,
-					a.asset_subtype_entitynode_id,
-                    a.asset_subtype_entitynode_name,
-					a.amc_applicable,
-					a.gst_applicable,
-					a.warranty_applicable,
-					a.depreciation_applicable,
-					a.admin_sanction_no,
-					a.admin_sanction_date,
-					a.technical_sanction_no,
-					a.technical_sanction_date,
-					a.work_order_no,
-					a.work_order_date,
-					a.supply_order_no,
-					a.supply_order_date,
-					a.vendor_name,
-					a.purchase_date,
-					a.source_of_fund,
-					a.purchase_code,
-					a.vendor_address_gst,
-					a.invoice_no,
-					a.gst_charged,
-					a.gst_percentage,
-					a.cost_excl_gst,
-					a.customs_duties,
-					a.other_costs,
-					a.other_costs_desc, 
-					a.discount,
-					a.total_cost,
-					a.capitalization_date,
-					a.itc_adjustment,
-					a.subsidy_adjustment,
-					a.duties_rebates_adjustment,
-					a.other_adjustments,
-					a.cost_after_adjustments,					
-					a.custom_fields,
-					a.is_verified,
-					a.verification_comment,
-					a.asset_status
+                    *
                FROM public.asset a
                $where
 			   ORDER BY a.asset_unique_code DESC  LIMIT $limit OFFSET $offset";  //echo($strsql); exit();
@@ -374,7 +362,7 @@ class common {
     return $this->conObj->db_query($this->conObj->c_link, $strsql);
 }
 
-	function getAssetsCount($typeId = 0, $subTypeId = 0, $entityId = 0, $nodeId = 0, $campusId = 0, $landId =0, $buildingId =0, $floorId=0, $roomId=0, $sectionId=0, $seatId=0,$userrole = "",$usersection="") {
+	function getAssetsCount($typeId = 0, $subTypeId = 0, $entityId = 0, $nodeId = 0, $campusId = 0, $landId =0, $buildingId =0, $floorId=0, $roomId=0, $sectionId=0, $seatId=0,$userrole = "",$usersection="",$assigned = "",$verified = "",$search="") {
 		$where = "WHERE 1=1"; 
 		if($userrole == "SectionAdmin")
 		{
@@ -394,11 +382,33 @@ class common {
 		if ($roomId) $where .= " AND room_id = $roomId";
 		if ($sectionId) $where .= " AND section_id = $sectionId";
 		if ($seatId) $where .= " AND seat_id = $seatId";
+		
+		$where .= $this->getAssignedCondition($assigned);
+		$where .= $this->getVerifiedCondition($verified);
+		$where .= $this->getSearchCondition($search);
+		if (trim($search) !== '') {
+        $search = pg_escape_string($search);
+        $where .= " AND (
+            asset_name ILIKE '%$search%' OR
+            asset_unique_code ILIKE '%$search%' OR
+            asset_kuhs_code ILIKE '%$search%' OR
+            asset_model_no ILIKE '%$search%' OR
+			asset_serial_no ILIKE '%$search%'
+        )";
+		}
 
-		$sql = "SELECT COUNT(*) as total FROM public.asset $where";  //echo($sql);
+		$sql = "SELECT COUNT(*) AS total,
+					   SUM(CASE WHEN is_verified = 't' THEN 1 ELSE 0 END) AS verified, 
+					   SUM(CASE WHEN section_id IS NOT NULL THEN 1 ELSE 0 END) AS assigned
+					   FROM public.asset $where"; //echo($sql); exit();
 		$res = $this->conObj->db_query($this->conObj->c_link, $sql);
 		$row = $this->conObj->db_fetch_array($res);
-		return $row['total'];
+
+		return [
+			'total' => $row['total'],
+			'verified' => $row['verified'],
+			'assigned' => $row['assigned']
+		];
 	}
 	
 	function getAssetFieldSettings($assetTypeId = null) {
