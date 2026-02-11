@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 
 const AddAssetSubType = () => {
   const { user } = useContext(UserContext);
+  const isViewMode = user.role === "ViewOnly";
   const location = useLocation();
   const preselectedAssetTypeId = location.state?.selectedAssetTypeId || '';
   const [code, setCode] = useState('');
@@ -147,7 +148,7 @@ const AddAssetSubType = () => {
             />
           </div> */}
 
-          <button className="btn btn-primary" onClick={handleAddAssetSubType}>ADD</button>
+          {!isViewMode && (<button className="btn btn-primary" onClick={handleAddAssetSubType}>ADD</button>)}
         </div>
 
         <ListAssetSubTypes refresh={refreshList} />

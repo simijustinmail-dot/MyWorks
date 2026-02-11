@@ -149,9 +149,11 @@ const ListAssetRow = ({ asset }) => {
                 </Row>
                 <h5 className="text-primary mt-4 mb-3">Verification Details</h5>
                 <Row className="mt-2">
-                    <Col md={6}><strong>Asset Status:</strong> {asset.asset_status}</Col>
+                    <Col md={3}><strong>Asset Status:</strong> {asset.asset_status}</Col>
                     <Col md={3}><strong>Verification Status:</strong> {asset.is_verified === 't' ? "Verified" : "Not Verified"}</Col>
-                    <Col md={3}><strong>Verification Comments:</strong> {asset.verification_comment}</Col>
+                    <Col md={6}><strong>Verification Comments:</strong> {asset.verification_comment}</Col>
+                    <Col md={3}><strong>Verified By:</strong> {asset.verified_by_name}</Col>
+                    <Col md={3}><strong>Verification Date:</strong>{asset.verification_date ? new Date(asset.verification_date).toLocaleDateString(): ""}</Col>
                 </Row>
                 {/* Dynamic Fields */}
                 {/* {asset.dynamic_fields?.length > 0 && (

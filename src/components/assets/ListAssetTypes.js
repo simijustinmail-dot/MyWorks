@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import Toast from '../Toast';
 import { useNavigate } from 'react-router-dom';
+import { UserContext } from '../../context/UserContext';
 
 
 const ListAssetTypes = ({ refresh }) => {
+  const { user } = useContext(UserContext);
+  const isViewMode = user.role === "ViewOnly";
   const [assetList, setAssetList] = useState([]);
   const [toast, setToast] = useState({ message: '', type: '' });
   const navigate = useNavigate();
@@ -93,7 +96,7 @@ const ListAssetTypes = ({ refresh }) => {
                 <td>{item.asset_type_desc}</td>
                 <td>{item.asset_class === 'T' ? 'Tangible' : 'Intangible'}</td>
                 <td className="d-flex gap-2">
-                  <button
+                  {!isViewMode && (<button
                     className="btn btn-sm btn-success me-2"
                     onClick={() =>
                       navigate('/assets/add-assetsubtype', {
@@ -106,13 +109,14 @@ const ListAssetTypes = ({ refresh }) => {
                     }
                   >
                     Add Subtype
-                  </button>
-                  <button
+                  </button>)}
+                  {!isViewMode && (<button
                     className="btn btn-danger btn-sm"
                     onClick={() => handleDelete(item.asset_type_id)}
                   >
                     Delete
-                  </button>
+                  </button>)}
+                  {isViewMode && <span className="text-muted">View only</span>}
                 </td>
               </tr>
             ))

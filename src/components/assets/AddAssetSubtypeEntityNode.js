@@ -8,7 +8,7 @@ import { useLocation } from 'react-router-dom';
 
 const AddAssetSubTypeEntityNode = () => {
   const { user } = useContext(UserContext);
-
+  const isViewMode = user.role === "ViewOnly";
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
@@ -144,7 +144,7 @@ const AddAssetSubTypeEntityNode = () => {
             />
           </div> */}
 
-          <button className="btn btn-primary" onClick={handleAddAssetSubTypeEntityNode}>ADD</button>
+          {!isViewMode && (<button className="btn btn-primary" onClick={handleAddAssetSubTypeEntityNode}>ADD</button>)}
         </div>
 
         <ListAssetSubTypeEntityNodes refresh={refreshList} />

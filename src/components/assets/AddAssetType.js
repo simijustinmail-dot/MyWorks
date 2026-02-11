@@ -7,6 +7,7 @@ import ListAssetTypes from './ListAssetTypes';
 
 const AddAssetType = () => {
   const { user } = useContext(UserContext);
+  const isViewMode = user.role === "ViewOnly";
 
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
@@ -118,7 +119,7 @@ const AddAssetType = () => {
               Intangible
             </button>
           </div>
-          <button className="btn btn-primary" onClick={handleAddAssetType}>ADD</button>
+          {!isViewMode && (<button className="btn btn-primary" onClick={handleAddAssetType}>ADD</button>)}
         </div>
 
 

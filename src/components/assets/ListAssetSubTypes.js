@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import Toast from '../Toast';
 import { useNavigate } from 'react-router-dom';
+import { UserContext } from '../../context/UserContext';
 
 const ListAssetSubTypes = ({ refresh }) => {
+  const { user } = useContext(UserContext);
+  const isViewMode = user.role === "ViewOnly";
   const [subtypes, setSubtypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ message: '', type: '' });
@@ -102,7 +105,7 @@ const ListAssetSubTypes = ({ refresh }) => {
                     {/* <td>{st.desc}</td> */}
                     <td>{st.asset_type_code} : {st.asset_type_name}</td>
                     <td>
-                      <button
+                      {!isViewMode && (<button
                         className="btn btn-sm btn-success me-2"
                         onClick={() =>
                           navigate('/assets/add-assetsubtypeentity', {
@@ -115,10 +118,11 @@ const ListAssetSubTypes = ({ refresh }) => {
                         }
                       >
                         Add SubType Entity
-                      </button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(st.asset_subtype_id)}>
+                      </button>)}
+                      {!isViewMode && (<button className="btn btn-danger btn-sm" onClick={() => handleDelete(st.asset_subtype_id)}>
                         Delete
-                      </button>
+                      </button>)}
+                      {isViewMode && <span className="text-muted">View only</span>}
                     </td>
                   </tr>
                 ))

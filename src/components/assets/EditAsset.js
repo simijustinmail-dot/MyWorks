@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import MainLayout from '../../layouts/Mainlayout';
 import axios from 'axios';
 import { Tabs, Tab, Container, Row, Col, Form, Button, Card } from 'react-bootstrap';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Toast from '../../components/Toast';
+import { UserContext } from '../../context/UserContext';
 
 
 const EditAsset = () => {
+    const { user } = useContext(UserContext); // Access user from context 
+    const isViewMode = user.role === "ViewOnly";
     const [toast, setToast] = useState({ message: '', type: '' });
     const location = useLocation();
     const navigate = useNavigate();
@@ -20,9 +23,10 @@ const EditAsset = () => {
     const assetId = incomingAsset?.asset_id || '';
     const action = location.state?.action || 'add';
     const isAdd = action === 'add';
-    const isEditable = action === 'edit';
+    const isEdit = action === 'edit';
     const isVerify = action === 'verify';
-    const isDisabled = isEditable || isVerify;
+    const isDisabled = isEdit || isVerify;
+    const isDisabledForSectionUser = (isEdit || isVerify) && user.role === "SectionAdmin";
     const [uniqueCode, setUniqueCode] = useState(incomingAsset?.asset_unique_code || '');
     const [kuhsCode, setKuhsCode] = useState(incomingAsset?.asset_kuhs_code || '');
     const [serialNo, setSerialNo] = useState(incomingAsset?.asset_serial_no || '');
@@ -113,8 +117,9 @@ const EditAsset = () => {
     const [impairmentLoss, setImpairmentLoss] = useState(incomingAsset?.impairment_loss || '');
 
     const [dynamicFields, setDynamicFields] = useState(incomingAsset?.dynamic_fields || []);
-
-    const [assetStatus, setAssetStatus] = useState(incomingAsset?.asset_status ||  (isVerify ? "Fully Functional" : null));
+    const [loadingFields, setLoadingFields] = useState(false);
+    const [assetFieldSettings, setAssetFieldSettings] = useState([]); // settings from DB
+    const [assetStatus, setAssetStatus] = useState(incomingAsset?.asset_status || (isVerify ? "Fully Functional" : null));
     const [verificationComment, setVerificationComment] = useState(incomingAsset?.verification_comment || '');
 
     const handleSave = () => {
@@ -183,6 +188,7 @@ const EditAsset = () => {
 
 
         const assetPayload = {
+            action: action,
             asset_id: assetId,
             asset_unique_code: uniqueCode,
             asset_kuhs_code: kuhsCode,
@@ -292,21 +298,21 @@ const EditAsset = () => {
             setToast({ message: "An error occurred while saving the asset.", type: "error" });
         });
     };
-    useEffect(() => {
-        if (incomingAsset?.custom_fields) {
-            try {
-                const parsed = JSON.parse(incomingAsset.custom_fields);
-                if (parsed.type === "fields") {
-                    const arr = Object.entries(parsed)
-                        .filter(([k]) => k !== "type")
-                        .map(([name, value]) => ({ name, value }));
-                    setDynamicFields(arr);
-                }
-            } catch (e) {
-                console.error("Invalid custom_fields JSON", e);
-            }
-        }
-    }, [incomingAsset]);
+    // useEffect(() => {
+    //     if (incomingAsset?.custom_fields) {
+    //         try {
+    //             const parsed = JSON.parse(incomingAsset.custom_fields);
+    //             if (parsed.type === "fields") {
+    //                 const arr = Object.entries(parsed)
+    //                     .filter(([k]) => k !== "type")
+    //                     .map(([name, value]) => ({ name, value }));
+    //                 setDynamicFields(arr);
+    //             }
+    //         } catch (e) {
+    //             console.error("Invalid custom_fields JSON", e);
+    //         }
+    //     }
+    // }, [incomingAsset]);
     useEffect(() => {
         axios.get(`${process.env.REACT_APP_API_BASE_URL}/pages/asset/asset.ajax.php`, {
             params: { type: 'getAssetTypes' },
@@ -378,6 +384,70 @@ const EditAsset = () => {
         });
         setSelectedNode('');
     }, [selectedEntity, incomingAsset?.asset_subtype_entitynode_id, userChangedType]);
+    useEffect(() => {
+        if (!selectedType) return;
+        setLoadingFields(true);
+
+        axios
+            .get(`${process.env.REACT_APP_API_BASE_URL}/pages/asset/asset.ajax.php`, {
+                params: { type: "getAssetFieldSettings", asset_type_id: selectedType },
+                withCredentials: true,
+            })
+            .then((res) => {
+                if (res.data.status === "success") {
+                    //const defs = res.data.data.flatMap((r) => r.dynamic_fields || []);
+                    //setDynamicFields(defs);
+                    setAssetFieldSettings(res.data.data);
+                }
+            })
+            .catch((err) => console.error("Error loading dynamic field settings:", err))
+            .finally(() => setLoadingFields(false));
+    }, [selectedType]);
+
+    // 🔹 Once asset & settings are available, merge in existing values
+    useEffect(() => {
+        if (!assetFieldSettings.length) {
+            setDynamicFields([]);
+            return; // wait for settings
+        }
+
+        let customFieldValues = {};
+        if (incomingAsset) { //edit/verify
+            // Prefer dynamicfields if provided
+            if (incomingAsset.dynamic_fields?.length) {
+                customFieldValues = incomingAsset.dynamic_fields;
+            }
+            // Otherwise fall back to JSON-based fields
+            else if (incomingAsset?.custom_fields) {
+                try {
+                    const parsed = JSON.parse(incomingAsset.custom_fields);
+                    if (parsed.type === "fields") {
+                        customFieldValues = Object.entries(parsed)
+                            .filter(([k]) => k !== "type")
+                            .map(([name, value]) => ({ name, value }));
+                    }
+                } catch (e) {
+                    console.error("Invalid custom_fields JSON", e);
+                }
+            }
+        }
+        if (!Array.isArray(customFieldValues)) customFieldValues = [];
+        // Filter fields by asset type and map to values (empty if no incomingAsset)
+        // Merge field settings with incoming values
+        const merged = assetFieldSettings
+            .filter(f => f.asset_type_id === incomingAsset?.asset_type_id || !incomingAsset)
+            .map(f => {
+                const match = customFieldValues.find(v => v.name === f.label);
+                return {
+                    name: f.label,
+                    value: match ? match.value : "",
+                    type: f.field_type
+                };
+            });
+
+
+        setDynamicFields(merged);
+    }, [assetFieldSettings, incomingAsset]);
     useEffect(() => {
         axios.get(`${process.env.REACT_APP_API_BASE_URL} /pages/misc/misc.ajax.php`, {
             params: { type: 'getCampuses' },
@@ -681,7 +751,7 @@ const EditAsset = () => {
                         </Card>
                     </Tab>
 
-                    <Tab eventKey="admin" title="Administrative">
+                    <Tab disabled={isDisabledForSectionUser} eventKey="admin" title="Administrative">
                         <Row>
                             <Col md={3}><Form.Group><Form.Label>Administrative Sanction Number</Form.Label><Form.Control type="text" value={adminSanctionNo} onChange={(e) => setAdminSanctionNo(e.target.value)} placeholder="Enter sanction number" /></Form.Group></Col>
                             <Col md={3}><Form.Group><Form.Label>Administrative Sanction Date</Form.Label><Form.Control type="date" value={adminSanctionDate} onChange={(e) => setAdminSanctionDate(e.target.value)} /></Form.Group></Col>
@@ -694,7 +764,7 @@ const EditAsset = () => {
                         </Row>
                     </Tab>
 
-                    <Tab eventKey="purchase" title="Purchase Info">
+                    <Tab disabled={isDisabledForSectionUser} eventKey="purchase" title="Purchase Info">
                         <Row>
                             <Col md={4}><Form.Group><Form.Label>Source of Fund</Form.Label><Form.Select value={sourceOfFund} onChange={(e) => setSourceOfFund(e.target.value)}>
                                 <option value="">Select Source</option>
@@ -712,7 +782,7 @@ const EditAsset = () => {
                         </Row>
                     </Tab>
 
-                    <Tab eventKey="cost" title="Cost Details">
+                    <Tab disabled={isDisabledForSectionUser} eventKey="cost" title="Cost Details">
                         <Row>
                             <Col md={4}><Form.Group><Form.Label>Purchase Cost (excl. GST & Duties)</Form.Label><Form.Control type="number" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} /></Form.Group></Col>
                             <Col md={4}><Form.Group><Form.Label>GST Charged in Invoice</Form.Label><Form.Control type="number" value={gstCharged} onChange={(e) => setGstCharged(e.target.value)} /></Form.Group></Col>
@@ -727,7 +797,7 @@ const EditAsset = () => {
 
 
 
-                    <Tab eventKey="disposal" title="Disposal">
+                    <Tab disabled={isDisabledForSectionUser} eventKey="disposal" title="Disposal">
                         <Row>
                             <Col md={4}><Form.Group><Form.Label>Date of Sale</Form.Label><Form.Control type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} /></Form.Group></Col>
                             <Col md={4}><Form.Group><Form.Label>Sale Invoice No</Form.Label><Form.Control type="text" value={saleInvoiceNo} onChange={e => setSaleInvoiceNo(e.target.value)} /></Form.Group></Col>
@@ -827,7 +897,7 @@ const EditAsset = () => {
                             </Card.Body>
                         </Card>
                     </Tab>
-                    <Tab eventKey="characteristics" title="Asset Specific Characteristics">
+                    <Tab disabled={isDisabledForSectionUser} eventKey="characteristics" title="Asset Specific Characteristics">
                         <Card className="mb-4">
                             <Card.Header>Dynamic Characteristics</Card.Header>
                             <Card.Body>
@@ -835,12 +905,14 @@ const EditAsset = () => {
                                 {/*<p>This section will dynamically load asset-specific fields based on the Asset SubType Entity from database settings.</p>*/}
                                 <Card.Body>
                                     <Row>
-                                        {dynamicFields.map((field, idx) => (
+                                        {loadingFields ? (
+                                            <p>Loading fields...</p>
+                                        ) : (dynamicFields.map((field, idx) => (
                                             <Col md={4} key={idx}>
                                                 <Form.Group className="mb-3">
                                                     <Form.Label>{field.name}</Form.Label>
                                                     <Form.Control
-                                                        type="text"
+                                                        type={field.type}
                                                         value={field.value || ""}
                                                         onChange={(e) => {
                                                             const updated = [...dynamicFields];
@@ -850,7 +922,7 @@ const EditAsset = () => {
                                                     />
                                                 </Form.Group>
                                             </Col>
-                                        ))}
+                                        )))}
                                     </Row>
                                 </Card.Body>
                             </Card.Body>
@@ -927,7 +999,7 @@ const EditAsset = () => {
 
                 <Row className="mt-4">
                     <Col className="text-center">
-                        <Button variant="primary" onClick={handleSave}>{isVerify ? 'Verify Asset Details' : 'Save Details'}</Button>
+                        {!isViewMode && (<Button variant="primary" onClick={handleSave}>{isVerify ? 'Verify Asset Details' : 'Save Details'}</Button>)}
                     </Col>
                 </Row>
             </Container>
