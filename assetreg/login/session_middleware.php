@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-$lifetime = 300; // 5 minutes
+$lifetime = 900; // 15 minutes
 
 if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > $lifetime)) {
     session_unset();
