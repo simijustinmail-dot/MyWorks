@@ -19,6 +19,7 @@ import AddAssetSubTypeEntity from './components/assets/AddAssetSubTypeEntity';
 import AddAssetSubtypeEntityNode from './components/assets/AddAssetSubtypeEntityNode';
 import AddAsset from './components/assets/EditAsset';
 import ListAssets from './components/assets/ListAssets';
+import BulkUpdateAssets from './components/assets/BulkUpdateAssets';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
         <Route path="/assets/add-assetsubtypeentitynode" element={<ProtectedRoute><AddAssetSubtypeEntityNode /></ProtectedRoute>} />
         <Route path="/assets/add-asset" element={<ProtectedRoute><AddAsset /></ProtectedRoute>} />
         <Route path="/assets/list-asset" element={<ProtectedRoute><ListAssets /></ProtectedRoute>} />
+        <Route path="/assets/bulkupdate-asset" element={<ProtectedRoute><BulkUpdateAssets /></ProtectedRoute>} />
       </Routes>
     </Router>
   );
