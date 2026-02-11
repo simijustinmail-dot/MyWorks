@@ -22,7 +22,7 @@ import { UserContext } from "../../context/UserContext";
 // }
 const AddSeat = () => {
   const { user } = useContext(UserContext);
-
+  const isViewMode = user.role === "ViewOnly";
   const [seatData, setSeatData] = useState({
     seat_name: "",
     seat_desc: "",
@@ -263,9 +263,9 @@ const AddSeat = () => {
             </div>
           </div>
 
-          <button className="btn btn-primary mt-3" onClick={handleAddSeat}>
+          {!isViewMode && (<button className="btn btn-primary mt-3" onClick={handleAddSeat}>
             ADD SEAT
-          </button>
+          </button>)}
         </div>
 
         <ListSeat refresh={refreshList} />

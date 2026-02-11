@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import Toast from '../../components/Toast';
+import { UserContext } from '../../context/UserContext';
 
 const ListLand = ({ refresh }) => {
+  const { user } = useContext(UserContext);
+  const isViewMode = user.role === "ViewOnly";
   const [lands, setLands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ message: '', type: '' });
@@ -114,12 +117,13 @@ const ListLand = ({ refresh }) => {
                     <td>{land.owner_name}</td>
                     <td>{land.registration_details}</td>
                     <td>
-                      <button
+                      {!isViewMode && (<button
                         className="btn btn-danger btn-sm"
                         onClick={() => handleDelete(land.land_id)}
                       >
                         Delete
-                      </button>
+                      </button>)}
+                      {isViewMode && <span className="text-muted">View only</span>}
                     </td>
                   </tr>
                 ))

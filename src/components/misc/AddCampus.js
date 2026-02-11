@@ -7,6 +7,7 @@ import Toast from '../Toast';
 
 const AddCampus = () => {
   const { user } = useContext(UserContext);
+  const isViewMode = user.role === "ViewOnly";
   const [campusname, setCampusName] = useState('');
   const [campusdesc, setCampusDesc] = useState('');
   const [toast, setToast] = useState({ message: '', type: '' });
@@ -68,7 +69,7 @@ const AddCampus = () => {
             <input type="text" className="form-control" placeholder="Enter the Campus Description"
               value={campusdesc} onChange={(e) => setCampusDesc(e.target.value)} />
           </div>
-          <button className="btn btn-primary" onClick={handleAddCampus}>ADD</button>
+          {!isViewMode && (<button className="btn btn-primary" onClick={handleAddCampus}>ADD</button>)}
         </div>
 
         <ListCampuses refresh={refreshList} />

@@ -10,6 +10,7 @@ const AddFloor = () => {
     const [toast, setToast] = useState({ message: '', type: '' });
     const [refreshList, setRefreshList] = useState(false);
     const { user } = useContext(UserContext);
+    const isViewMode = user.role === "ViewOnly";
 
     const [floorData, setFloorData] = useState({
         buildingId: '',
@@ -117,7 +118,7 @@ const AddFloor = () => {
                         ))}
                     </div>
 
-                    <button className="btn btn-primary mt-3" onClick={handleAddFloor}>ADD FLOOR</button>
+                    {!isViewMode && (<button className="btn btn-primary mt-3" onClick={handleAddFloor}>ADD FLOOR</button>)}
                 </div>
 
                 <ListFloor refresh={refreshList} />

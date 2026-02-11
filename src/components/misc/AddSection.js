@@ -11,6 +11,7 @@ const AddSection = () => {
     const [toast, setToast] = useState({ message: '', type: '' });
     const [refreshList, setRefreshList] = useState(false);
     const { user } = useContext(UserContext);
+    const isViewMode = user.role === "ViewOnly";
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -77,7 +78,7 @@ const AddSection = () => {
                         ))}
                     </div>
 
-                    <button className="btn btn-primary mt-3" onClick={handleAddSection}>ADD SECTION</button>
+                    {!isViewMode && (<button className="btn btn-primary mt-3" onClick={handleAddSection}>ADD SECTION</button>)}
                 </div>
 
                 <ListSection refresh={refreshList} />

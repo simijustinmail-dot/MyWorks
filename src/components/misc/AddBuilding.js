@@ -7,7 +7,7 @@ import ListBuilding from './ListBuilding';
 
 const AddBuilding = () => {
   const { user } = useContext(UserContext);
-
+  const isViewMode = user.role === "ViewOnly";
   const [buildingData, setBuildingData] = useState({
     buildingName: '',
     buildingDesc: '',
@@ -137,9 +137,9 @@ const AddBuilding = () => {
 
           </div>
 
-          <button className="btn btn-primary mt-3" onClick={handleAddBuilding}>
+          {!isViewMode && (<button className="btn btn-primary mt-3" onClick={handleAddBuilding}>
             ADD
-          </button>
+          </button>)}
         </div>
         <ListBuilding refresh={refreshList} />
       </div>

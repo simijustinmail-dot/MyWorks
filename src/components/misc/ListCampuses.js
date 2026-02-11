@@ -1,9 +1,12 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import Toast from '../Toast';
+import { UserContext } from '../../context/UserContext';
 
 const ListCampuses = ({ refresh }) => {
+  const { user } = useContext(UserContext);
+  const isViewMode = user.role === "ViewOnly";
   const [campuses, setCampuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ message: '', type: '' });
@@ -96,12 +99,13 @@ const ListCampuses = ({ refresh }) => {
                   {/* <td>{campus.created_by}</td>
                   <td>{campus.created_date}</td> */}
                   <td>
-                    <button
+                    {!isViewMode && (<button
                       className="btn btn-danger btn-sm"
                       onClick={() => handleDelete(campus.campus_id)}
                     >
                       Delete
-                    </button>
+                    </button>)}
+                    {isViewMode && <span className="text-muted">View only</span>}
                   </td>
                 </tr>
               ))

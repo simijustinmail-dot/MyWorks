@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import Toast from '../../components/Toast';
+import { UserContext } from '../../context/UserContext';
 
 const ListSection = ({ refresh }) => {
     const [sections, setSections] = useState([]);
     const [toast, setToast] = useState({ message: '', type: '' });
     const [loading, setLoading] = useState(true);
+    const { user } = useContext(UserContext);
+    const isViewMode = user.role === "ViewOnly";
 
     const fetchSections = async () => {
         setLoading(true);
@@ -83,7 +86,8 @@ const ListSection = ({ refresh }) => {
                                         <td>{sec.section_name}</td>
                                         <td>{sec.section_desc}</td>
                                         <td>
-                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(sec.section_id)}>Delete</button>
+                                            {!isViewMode && (<button className="btn btn-danger btn-sm" onClick={() => handleDelete(sec.section_id)}>Delete</button>)}
+                                            {isViewMode && <span className="text-muted">View only</span>}
                                         </td>
                                     </tr>
                                 ))

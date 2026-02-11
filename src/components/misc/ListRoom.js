@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import Toast from '../../components/Toast';
+import { UserContext } from '../../context/UserContext';
 
 const ListRoom = ({ refresh }) => {
+    const { user } = useContext(UserContext);
+    const isViewMode = user.role === "ViewOnly";
     const [rooms, setRooms] = useState([]);
     const [toast, setToast] = useState({ message: '', type: '' });
     const [loading, setLoading] = useState(true);
@@ -87,7 +90,8 @@ const ListRoom = ({ refresh }) => {
                                         <td>{room.floor_name}</td>
                                         <td>{room.building_name}</td>
                                         <td>
-                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(room.room_id)}>Delete</button>
+                                            {!isViewMode && (<button className="btn btn-danger btn-sm" onClick={() => handleDelete(room.room_id)}>Delete</button>)}
+                                            {isViewMode && <span className="text-muted">View only</span>}
                                         </td>
                                     </tr>
                                 ))

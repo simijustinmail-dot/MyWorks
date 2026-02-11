@@ -7,7 +7,7 @@ import ListLand from './ListLand';
 
 const AddLand = () => {
   const { user } = useContext(UserContext);
-
+  const isViewMode = user.role === "ViewOnly";
   const [landData, setLandData] = useState({
     landName: '',
     landDesc: '',
@@ -183,7 +183,7 @@ const AddLand = () => {
             ))}
           </div>
 
-          <button className="btn btn-primary mt-3" onClick={handleAddLand}>ADD</button>
+          {!isViewMode && (<button className="btn btn-primary mt-3" onClick={handleAddLand}>ADD</button>)}
         </div>
 
         <ListLand refresh={refreshList} />
